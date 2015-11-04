@@ -1,0 +1,8 @@
+{
+	"tcp6host":"[::1]:10001",
+	"wgs84_nogps":{
+		"latitude":55.69147,
+		"longitude":12.61681,
+		"altitude":2.01
+	}
+}

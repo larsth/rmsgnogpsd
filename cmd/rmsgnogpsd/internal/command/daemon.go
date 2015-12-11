@@ -8,6 +8,8 @@ import (
 	"net"
 	"os"
 	"time"
+	
+	binmsg "github.com/larsth/go-rmsggpsbinmsg"
 
 	"github.com/spf13/cobra"
 )
@@ -16,13 +18,14 @@ var (
 	daemonCmd = &cobra.Command{
 		Use: "daemon",
 		Short: "Sub-command 'daemon' starts this program as a daemon (service) " +
-			"that tells UNIX domain clients about its GPS location.",
+			"that tells TCP clients about its GPS location.",
 		Long: "Sub-command 'daemon' starts this program as a " +
-			"daemon (service) that tells UNIX domain clients about its GPS " +
+			"daemon (service) that tells TCP clients about its GPS " +
 			"location. The GPS location does only come " +
 			"from a JSON document/file. The GPS location can only be changed " +
 			"by changing the JSON document/file, and then restart the daemon " +
-			"(service).",
+			"(service).\n"+
+			"A Timestamp (date and time) is set once, when the daemon starts.",
 		Example: "nohup rmsgnogpsd daemon -c ./example_rmsgnogpsd_configuration_file.json",
 		RunE: runDaemonE,
 	}
@@ -38,7 +41,7 @@ func handleConnection(connChan chan *net.TCPConn) {
 
 	select {
 	case conn = <-connChan:
-		if message, err = json.Marshal(&data.Config.Gps); err != nil {
+		if message, err = json.Marshal(data.Payload); err != nil {
 			conn.CloseWrite()
 			log.Fatalln(err.Error())
 		}
@@ -52,7 +55,7 @@ func handleConnection(connChan chan *net.TCPConn) {
 		}
 		conn.CloseWrite()
 		buf.Reset()
-		message = message[0:0:cap(message)]
+		message = message[0:0:cap(message)] //reuse slice and it's backing array
 		err = nil
 		conn = nil
 	}
@@ -107,6 +110,7 @@ func runDaemonE(_ *cobra.Command, _ []string) error {
 		configFile *os.File
 		err        error
 		decoder    *json.Decoder
+		workers, i uint
 
 		connChan chan *net.TCPConn
 	)
@@ -137,6 +141,25 @@ func runDaemonE(_ *cobra.Command, _ []string) error {
 	//Host string:
 	//data.Host = fmt.Sprintf("%s:%d", DefaultHost, flags.Port)
 	//}
+	
+	//Create binmsg.Payload structure.
+	//Don't use *Binary methods on Paylaod structure
+	// - won't work because we initialize Payload without a HMACKey and a salt.
+	data.Payload = &binmsg.Payload{}
+	
+	//Copy data from 'data.Config.Gps' to the Payload:
+	data.Payload.Message.Gps.SetAlt(data.Config.Gps.Alt)
+	data.Payload.Message.Gps.SetLat(data.Config.Gps.Lat)
+	data.Payload.Message.Gps.SetLon(data.Config.Gps.Lon)
+	
+	//Set the TimeStamp
+	data.Payload.Message.TimeStamp.Time = time.Now().UTC()
+	//Set FixMode
+	if data.Config.Gps.Alt == float64(0.0) {
+		data.Payload.Message.Gps.FixMode = binmsg.Fix2D
+	} else {
+		data.Payload.Message.Gps.FixMode = binmsg.Fix3D
+	}
 
 	//Create the *net.TCPAddr:
 	if data.Tcp.Addr, err = net.ResolveTCPAddr("tcp6", data.Host); err != nil {
@@ -153,9 +176,18 @@ func runDaemonE(_ *cobra.Command, _ []string) error {
 
 	//Create the connection channel:
 	connChan = make(chan *net.TCPConn, 0)
-
-	//Start 100 TCP client connection workers:
-	for i := 1; i <= 100; i++ {
+	
+	if data.Config.Workers != nil {
+		if (*data.Config.Workers) > 0 {
+			workers = (*data.Config.Workers)
+		} else {
+			workers = defaultClientConnectionWorkers
+		}
+	} else {
+		workers = defaultClientConnectionWorkers
+	}
+	//Start 'workers' number of TCP client connection workers:
+	for i = 1; i <= workers; i++ {
 		go handleConnection(connChan)
 	}
 

@@ -1,6 +1,10 @@
 package command
 
-import "net"
+import (
+	"net"
+
+	binmsg "github.com/larsth/go-rmsggpsbinmsg"
+)
 
 type Gps struct {
 	Lat float64 `json:"latitude"`
@@ -9,8 +13,9 @@ type Gps struct {
 }
 
 type Config struct {
-	Host string `json:"tcp6host,omitempty"`
-	Gps  Gps    `json:"wgs84_nogps"`
+	Workers *uint  `json: workers,omitempty`
+	Host    string `json:"tcp6host,omitempty"`
+	Gps     Gps    `json:"wgs84_nogps"`
 }
 
 type Flags struct {
@@ -24,15 +29,17 @@ type TcpData struct {
 }
 
 type Data struct {
-	Host   string
-	Config Config
-	Tcp    TcpData
+	Payload *binmsg.Payload
+	Host    string
+	Config  Config
+	Tcp     TcpData
 }
 
 const (
 	CommandName = "rmsgnogpsd"
 	//DefaultPort uint16 = 10001
-	DefaultHost = "[::1]"
+	DefaultHost                    = "[::1]"
+	defaultClientConnectionWorkers = 16
 )
 
 var (

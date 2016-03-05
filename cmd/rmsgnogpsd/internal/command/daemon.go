@@ -10,6 +10,7 @@ import (
 	"time"
 	
 	binmsg "github.com/larsth/go-rmsggpsbinmsg"
+	"github.com/larsth/go-gpsfix"
 
 	"github.com/spf13/cobra"
 )
@@ -156,9 +157,9 @@ func runDaemonE(_ *cobra.Command, _ []string) error {
 	data.Payload.Message.TimeStamp.Time = time.Now().UTC()
 	//Set FixMode
 	if data.Config.Gps.Alt == float64(0.0) {
-		data.Payload.Message.Gps.FixMode = binmsg.Fix2D
+		data.Payload.Message.Gps.FixMode = gpsfix.Fix2D
 	} else {
-		data.Payload.Message.Gps.FixMode = binmsg.Fix3D
+		data.Payload.Message.Gps.FixMode = gpsfix.Fix3D
 	}
 
 	//Create the *net.TCPAddr:

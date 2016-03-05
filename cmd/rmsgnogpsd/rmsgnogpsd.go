@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/larsth/rmsgnogpsd/cmd/rmsgnogpsd/internal/command"
+	"github.com/larsth/rmsgnogpsd/cmd/rmsgnogpsd/intern/command"
 	"github.com/spf13/cobra"
 )
 
